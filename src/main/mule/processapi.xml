@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:insurance-quotes="http://www.mulesoft.org/schema/mule/insurance-quotes" xmlns:insurance-system-api="http://www.mulesoft.org/schema/mule/insurance-system-api" xmlns:insurance-system-api-sf="http://www.mulesoft.org/schema/mule/insurance-system-api-sf" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd  http://www.mulesoft.org/schema/mule/insurance-system-api-sf http://www.mulesoft.org/schema/mule/insurance-system-api-sf/current/mule-insurance-system-api-sf.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/insurance-system-api http://www.mulesoft.org/schema/mule/insurance-system-api/current/mule-insurance-system-api.xsd http://www.mulesoft.org/schema/mule/insurance-quotes http://www.mulesoft.org/schema/mule/insurance-quotes/current/mule-insurance-quotes.xsd">
+    <http:listener-config name="processapi-httpListenerConfig">
+        <http:listener-connection host="0.0.0.0" port="8081" />
+    </http:listener-config>
+    <apikit:config name="processapi-config" api="resource::ad30d2ec-566c-4843-a49d-80728a57ffdc:processapi:1.0.1:raml:zip:processapi.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+    <insurance-system-api-sf:config name="InsuranceSystemApiSF_Config" doc:name="InsuranceSystemApiSF Config" doc:id="1a783375-2e91-4597-9996-f5f8eb10accf" property_host="system-api-sf.us-e2.cloudhub.io" property_port="80" property_protocol="HTTP" property_client-id="rohit" property_client-secret="rohitijha" property_basePath="/api" property_responseTimeout="30000"/>
+    <insurance-system-api:config name="InsuranceSystemApi_Config" doc:name="InsuranceSystemApi Config" doc:id="d2d0feec-45fa-48f0-a7a4-0b6758498a1f" property_host="system-api-postgresql.us-e2.cloudhub.io" property_port="80" property_protocol="HTTP" property_client-id="rohit" property_client-secret="rohitojha" property_basePath="/api" property_responseTimeout="30000"/>
+    <insurance-quotes:config name="InsuranceQuotes_Config" doc:name="InsuranceQuotes Config" doc:id="820392db-aa91-4d72-98dd-e5d5fecedc3d" property_host="system-external-api.us-e2.cloudhub.io" property_port="80" property_protocol="HTTP" property_basePath="/api" property_responseTimeout="30000"/>
+    <flow name="processapi-main">
+        <http:listener config-ref="processapi-httpListenerConfig" path="/api/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:router config-ref="processapi-config" doc:id="d4031b2d-8677-41c4-9d82-45b15860945d"/>
+        <error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Bad request"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="processapi-console">
+        <http:listener config-ref="processapi-httpListenerConfig" path="/console/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="processapi-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <sub-flow name="Endflow" doc:id="718a6f62-6854-42e8-b781-2902ce6d027a">
+        <ee:transform doc:name="Transform Message" doc:id="e3514a11-5ba8-4d0b-aa37-b68caf666837">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <set-variable value="#[payload]" doc:name="Set Variable" doc:id="7c1229c7-9be2-49df-b308-8453fb00fc4b" variableName="user" />
+        <logger level="INFO" doc:name="Logger" doc:id="79a27e8f-c7c4-4219-a33e-111243aa8357" message="#[payload]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="5215a797-0820-489c-8380-b2f253cae4bc" message="#[payload[7]]"/>
+		<insurance-quotes:get-quotes doc:name="Get quotes" doc:id="08392f0d-e9cf-4299-b0cf-4cc6f5044cd6" config-ref="InsuranceQuotes_Config" premium-name="#[payload[7]]" premium-provider="#[payload[6]]"/>
+        <ee:transform doc:name="Transform Message" doc:id="d5333903-ce86-4ee3-8b36-9b002df5db60">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <ee:transform doc:name="Transform Message" doc:id="2f978f38-6300-4d66-b00d-4a716baabe66">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	ID: vars.user.Id__c,
+	name: vars.user.Name__c,
+	gender: vars.user.Gender__c,
+	age: vars.user.Age__c,
+	city: vars.user.City__c,
+	contactNumber: vars.user.ContactNumber__c,
+	salary: vars.user.Salary__c,
+	premiumProvider: payload.PREMIUMPROVIDER,
+	premiumName: payload.PREMIUMNAME,
+	premiumType: payload.PREMIUMTYPE,
+	coverageAmount: payload.COVERAGEAMOUNT 	,
+	emailId: vars.user.EmailId__c,
+	monthlypremium: payload.MONTHLYPREMIUM
+	
+}]]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+        <set-variable value="#[payload]" doc:name="Set Variable" doc:id="337df30a-148e-403b-88a2-bd9a37bad4e1" variableName="end" />
+    </sub-flow>
+    <flow name="get:\getQuotesDetails\(id):processapi-config">
+		<set-variable value="#[attributes.uriParams.id]" doc:name="Set Variable" doc:id="6b6d684f-4ec7-4a55-81e1-dcdfcdd454ec" variableName="Id" />
+		<insurance-system-api-sf:get-insurance-by-id doc:id="c6a5222f-6044-45a6-a2e8-02dba9e1faf6" config-ref="InsuranceSystemApiSF_Config" id="#[vars.Id]" />
+		<choice doc:name="Choice" doc:id="286cbf8b-5fe8-40d8-b00a-6e41a9ad7842">
+            <when expression="#[isEmpty(payload)]">
+                <insurance-system-api:get-insurance-by-id doc:name="Get insurance by id" doc:id="8fb68a0c-822a-4d6c-bd65-bd6ac4a5c1e1" config-ref="InsuranceSystemApi_Config" id="#[vars.id]" />
+                <flow-ref doc:name="Flow Reference" doc:id="b0860342-39a8-4884-b4fe-a6f48015e8fe" name="Endflow" />
+                <ee:transform doc:name="Transform Message" doc:id="885c948f-b574-47d3-8806-18b2e1561f9e">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+vars.end]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </when>
+            <otherwise>
+                <flow-ref doc:name="Flow Reference" doc:id="3f8bea7c-1de3-45ce-b136-62ff31c0ac21" name="Endflow" />
+                <logger level="INFO" doc:name="Logger" doc:id="495805b7-1a08-4ee0-b7a8-7ab728d593f2" message="Karan Code is here"/>
+				<logger level="INFO" doc:name="Logger" doc:id="b4f1b720-ba54-4da1-866d-84bd58477694" message="#[payload]"/>
+				<logger level="INFO" doc:name="Logger" doc:id="a6c4f0a2-702a-4bb9-ad0d-c3a4f3043d80" message="#[vars.end]"/>
+            </otherwise>
+        </choice>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="79ff1780-3598-4a9f-aee5-dc7eca45c47a" >
+				<ee:transform doc:name="Transform Message" doc:id="bc131b82-9cd7-4cc2-abb5-77ce810034e1" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	message: "Server not found"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-continue>
+		</error-handler>
+    </flow>
+</mule>
